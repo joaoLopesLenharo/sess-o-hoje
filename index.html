@@ -94,6 +94,10 @@
                     <button onclick="showSyncModal()" class="px-2 py-1.5 rounded text-xs font-bold bg-slate-700 hover:bg-slate-600 text-white transition-colors" title="Configurar sincronização">
                         <i class="fa-solid fa-gear"></i>
                     </button>
+                    <button id="btn-copy-url" onclick="copyCurrentUrl()" class="px-3 py-1.5 rounded text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors flex items-center gap-2" title="Copiar URL atual">
+                        <i class="fa-solid fa-link"></i>
+                        Copiar URL
+                    </button>
                 </div>
             </div>
         </div>
@@ -792,6 +796,44 @@
             if (syncEnabled) {
                 syncToCloud();
             }
+        }
+
+        function copyCurrentUrl() {
+            const currentUrl = window.location.href;
+            const btn = document.getElementById('btn-copy-url');
+            
+            navigator.clipboard.writeText(currentUrl).then(() => {
+                // Feedback visual
+                if (btn) {
+                    const originalHTML = btn.innerHTML;
+                    btn.innerHTML = '<i class="fa-solid fa-check"></i> Copiado!';
+                    btn.classList.remove('bg-amber-600', 'hover:bg-amber-700');
+                    btn.classList.add('bg-green-600');
+                    
+                    setTimeout(() => {
+                        btn.innerHTML = originalHTML;
+                        btn.classList.remove('bg-green-600');
+                        btn.classList.add('bg-amber-600', 'hover:bg-amber-700');
+                    }, 2000);
+                } else {
+                    alert('URL copiada para a área de transferência!');
+                }
+            }).catch(() => {
+                // Fallback para navegadores mais antigos
+                const textArea = document.createElement('textarea');
+                textArea.value = currentUrl;
+                textArea.style.position = 'fixed';
+                textArea.style.opacity = '0';
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert('URL copiada para a área de transferência!');
+                } catch (err) {
+                    prompt('Copie a URL manualmente:', currentUrl);
+                }
+                document.body.removeChild(textArea);
+            });
         }
 
         async function generateShareLink() {
