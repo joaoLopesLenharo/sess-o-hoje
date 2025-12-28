@@ -1,0 +1,38 @@
+name: Sync Battle Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_id:
+        description: 'Session ID'
+        required: true
+        type: string
+      data:
+        description: 'JSON data'
+        required: true
+        type: string
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create data directory
+        run: mkdir -p data
+
+      - name: Save battle data
+        run: |
+          echo '${{ github.event.inputs.data }}' > "data/battle_${{ github.event.inputs.session_id }}.json"
+          
+      - name: Commit and push
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add data/
+          git commit -m "Update battle data for session ${{ github.event.inputs.session_id }}" || exit 0
+          git push
+

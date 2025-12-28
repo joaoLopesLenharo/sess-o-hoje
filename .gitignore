@@ -37,6 +37,7 @@ config.local.js
 .env
 .env.local
 .env.*.local
+sync-config.js
 
 # Arquivos de build (se houver)
 dist/
