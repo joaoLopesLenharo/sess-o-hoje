@@ -14,16 +14,9 @@ Esta aplicação pode usar a GitHub API para armazenar dados de batalha em arqui
 3. Configure:
    - **Note**: `Battle Sync Token`
    - **Expiration**: Escolha uma data (ou "No expiration")
-   - **Scopes**: Na seção **"repo"**, marque:
-     - ✅ **repo** (Full control of private repositories)
-       - Isso inclui automaticamente: repo:status, repo_deployment, public_repo, repo:invite, security_events
-4. Clique em **"Generate token"** (rolar até o final da página)
+   - **Scopes**: Marque `repo` (Full control of private repositories)
+4. Clique em **"Generate token"**
 5. **COPIE O TOKEN** (você só verá ele uma vez!)
-
-**Nota**: Se você não vir a opção "repo", procure por:
-- **"Full control of private repositories"** 
-- Ou expanda a seção **"repo"** clicando nela
-- Ou use **Fine-grained tokens** (mais novo) com permissão "Contents: Read and write"
 
 ## ⚙️ Configuração
 
@@ -77,10 +70,8 @@ Cada arquivo contém:
 ## 🐛 Troubleshooting
 
 ### Erro: "GitHub API error: Bad credentials"
-- Verifique se o token está correto (copie e cole novamente)
-- Verifique se o token tem permissão `repo` (Full control of private repositories)
-- Se usar Fine-grained token, certifique-se de ter permissão "Contents: Read and write"
-- Verifique se o token não expirou
+- Verifique se o token está correto
+- Verifique se o token tem permissão `repo`
 
 ### Erro: "GitHub API error: Not Found"
 - Verifique se o nome do repositório está correto
