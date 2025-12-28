@@ -799,10 +799,24 @@
         }
 
         function copyCurrentUrl() {
-            const currentUrl = window.location.href;
             const btn = document.getElementById('btn-copy-url');
             
-            navigator.clipboard.writeText(currentUrl).then(() => {
+            // Gerar link compartilhável com dados atuais
+            const sessionId = syncSessionId || localStorage.getItem('sync_session_id') || 'batalha-' + Date.now();
+            
+            const data = {
+                squads: squads,
+                timestamp: new Date().toISOString(),
+                sessionId: sessionId,
+                version: '1.0'
+            };
+            
+            // Criar link com dados codificados na URL
+            const jsonStr = JSON.stringify(data);
+            const shareData = encodeBase64(jsonStr);
+            const shareUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(sessionId)}&data=${encodeURIComponent(shareData)}`;
+            
+            navigator.clipboard.writeText(shareUrl).then(() => {
                 // Feedback visual
                 if (btn) {
                     const originalHTML = btn.innerHTML;
@@ -816,21 +830,21 @@
                         btn.classList.add('bg-amber-600', 'hover:bg-amber-700');
                     }, 2000);
                 } else {
-                    alert('URL copiada para a área de transferência!');
+                    alert('URL compartilhável copiada para a área de transferência!');
                 }
             }).catch(() => {
                 // Fallback para navegadores mais antigos
                 const textArea = document.createElement('textarea');
-                textArea.value = currentUrl;
+                textArea.value = shareUrl;
                 textArea.style.position = 'fixed';
                 textArea.style.opacity = '0';
                 document.body.appendChild(textArea);
                 textArea.select();
                 try {
                     document.execCommand('copy');
-                    alert('URL copiada para a área de transferência!');
+                    alert('URL compartilhável copiada para a área de transferência!');
                 } catch (err) {
-                    prompt('Copie a URL manualmente:', currentUrl);
+                    prompt('Copie a URL manualmente:', shareUrl);
                 }
                 document.body.removeChild(textArea);
             });
