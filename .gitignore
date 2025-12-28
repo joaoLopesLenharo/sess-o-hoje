@@ -1,0 +1,60 @@
+# Arquivos do sistema operacional
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+inimigos.html
+esquad.html
+# Arquivos de editores e IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Arquivos temporários
+*.tmp
+*.temp
+*.log
+*.cache
+
+# Arquivos de backup
+*.bak
+*.backup
+*~
+
+# Arquivos de configuração local (se houver)
+config.local.js
+.env
+.env.local
+.env.*.local
+
+# Arquivos de build (se houver)
+dist/
+build/
+node_modules/
+package-lock.json
+yarn.lock
+
+# Arquivos de teste
+test-results/
+coverage/
+
+# Arquivos de documentação temporária
+*.md.bak
+TODO.txt
+
+# Arquivos de dados locais (se necessário)
+# Descomente se não quiser versionar dados locais
+# *.local.json
+# data/local/
+
