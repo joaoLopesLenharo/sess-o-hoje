@@ -507,21 +507,33 @@
                     const shareUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(syncSessionId)}`;
                     sessionStorage.setItem('share_url', shareUrl);
                     
-                    // Tentar usar um serviço público de armazenamento (JSONBin.io)
-                    // Nota: Requer criar um bin público primeiro via generateShareLink
-                    const binId = localStorage.getItem(`bin_id_${syncSessionId}`);
-                    if (binId) {
+                    // Tentar usar JSONBin.io para sincronização pública
+                    const existingBinId = localStorage.getItem(`bin_id_${syncSessionId}`);
+                    
+                    if (existingBinId) {
                         // Atualizar bin existente
-                        fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+                        fetch(`https://api.jsonbin.io/v3/b/${existingBinId}`, {
                             method: 'PUT',
                             headers: {
                                 'Content-Type': 'application/json',
-                                'X-Master-Key': '$2b$10$dummy' // Bin público não precisa de key real
+                                'X-Bin-Private': 'false'
                             },
                             body: JSON.stringify(data)
-                        }).catch(() => {
-                            // Se falhar, continuar com localStorage
+                        }).then(res => {
+                            if (!res.ok) {
+                                console.log('Erro ao atualizar bin, tentando criar novo...');
+                                throw new Error('Bin update failed');
+                            }
+                            console.log('Bin atualizado com sucesso');
+                        }).catch((err) => {
+                            console.log('Erro ao atualizar bin:', err);
+                            // Se falhar, tentar criar novo bin
+                            createNewBin(syncSessionId, data);
                         });
+                    } else {
+                        // Criar novo bin se não existir
+                        console.log('Criando novo bin para sessão:', syncSessionId);
+                        createNewBin(syncSessionId, data);
                     }
                 } catch (e) {
                     console.error('Erro ao sincronizar:', e);
@@ -554,58 +566,113 @@
                     })
                     .catch(err => console.log('Sync fetch error:', err));
             } else {
-                // Buscar de localStorage compartilhado
-                try {
-                    const shareData = localStorage.getItem(storageKey);
-                    const remoteTimestamp = parseInt(localStorage.getItem(`${storageKey}_timestamp`) || '0');
-                    const localTimestamp = parseInt(localStorage.getItem(`local_${storageKey}_timestamp`) || '0');
-                    
-                    if (shareData && remoteTimestamp > localTimestamp) {
-                        const decodedData = decodeBase64(shareData);
-                        const data = JSON.parse(decodedData);
-                        if (data.squads && data.sessionId === syncSessionId) {
-                            const jsonStr = JSON.stringify(data);
-                            const remoteHash = simpleHash(jsonStr).substring(0, 16);
-                            if (remoteHash !== lastSyncHash) {
-                                squads = data.squads;
-                                saveSquads();
-                                renderSquads();
-                                renderStatusSummary();
-                                lastSyncHash = remoteHash;
-                                localStorage.setItem(`local_${storageKey}_timestamp`, remoteTimestamp.toString());
-                                updateLastSyncTime();
-                            }
+                // Priorizar JSONBin.io para sincronização entre múltiplos usuários
+                const binId = localStorage.getItem(`bin_id_${syncSessionId}`);
+                
+                if (binId) {
+                    fetch(`https://api.jsonbin.io/v3/b/${binId}/latest?t=${Date.now()}`, {
+                        headers: {
+                            'X-Bin-Meta': 'false'
                         }
-                    }
-                    
-                    // Tentar buscar de JSONBin.io se configurado
-                    const binId = localStorage.getItem(`bin_id_${syncSessionId}`);
-                    if (binId) {
-                        fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`)
-                            .then(res => res.json())
-                            .then(result => {
-                                if (result.record && result.record.squads && result.record.sessionId === syncSessionId) {
-                                    const data = result.record;
-                                    const jsonStr = JSON.stringify(data);
-                                    const remoteHash = simpleHash(jsonStr).substring(0, 16);
-                                    if (remoteHash !== lastSyncHash) {
-                                        squads = data.squads;
-                                        saveSquads();
-                                        renderSquads();
-                                        renderStatusSummary();
-                                        lastSyncHash = remoteHash;
-                                        updateLastSyncTime();
-                                    }
+                    })
+                        .then(res => {
+                            if (!res.ok) {
+                                console.log('Erro ao buscar do JSONBin.io:', res.status, res.statusText);
+                                throw new Error(`HTTP ${res.status}`);
+                            }
+                            return res.json();
+                        })
+                        .then(result => {
+                            console.log('Dados recebidos do JSONBin.io:', result);
+                            if (result.record && result.record.squads && result.record.sessionId === syncSessionId) {
+                                const data = result.record;
+                                const jsonStr = JSON.stringify(data);
+                                const remoteHash = simpleHash(jsonStr).substring(0, 16);
+                                if (remoteHash !== lastSyncHash) {
+                                    console.log('Dados atualizados detectados, sincronizando...');
+                                    squads = data.squads;
+                                    saveSquads();
+                                    renderSquads();
+                                    renderStatusSummary();
+                                    lastSyncHash = remoteHash;
+                                    updateLastSyncTime();
+                                } else {
+                                    console.log('Dados já estão sincronizados');
                                 }
-                            })
-                            .catch(() => {
-                                // Se falhar, continuar com localStorage
-                            });
-                    }
-                } catch (e) {
-                    console.error('Erro ao buscar sincronização:', e);
+                            }
+                        })
+                        .catch((err) => {
+                            console.log('Erro ao buscar do JSONBin.io, usando localStorage:', err);
+                            // Se falhar, tentar localStorage como fallback
+                            syncFromLocalStorage(storageKey);
+                        });
+                } else {
+                    console.log('Nenhum bin ID encontrado, usando localStorage');
+                    // Se não houver bin, usar localStorage
+                    syncFromLocalStorage(storageKey);
                 }
             }
+        }
+
+        function syncFromLocalStorage(storageKey) {
+            try {
+                const shareData = localStorage.getItem(storageKey);
+                const remoteTimestamp = parseInt(localStorage.getItem(`${storageKey}_timestamp`) || '0');
+                const localTimestamp = parseInt(localStorage.getItem(`local_${storageKey}_timestamp`) || '0');
+                
+                if (shareData && remoteTimestamp > localTimestamp) {
+                    const decodedData = decodeBase64(shareData);
+                    const data = JSON.parse(decodedData);
+                    if (data.squads && data.sessionId === syncSessionId) {
+                        const jsonStr = JSON.stringify(data);
+                        const remoteHash = simpleHash(jsonStr).substring(0, 16);
+                        if (remoteHash !== lastSyncHash) {
+                            squads = data.squads;
+                            saveSquads();
+                            renderSquads();
+                            renderStatusSummary();
+                            lastSyncHash = remoteHash;
+                            localStorage.setItem(`local_${storageKey}_timestamp`, remoteTimestamp.toString());
+                            updateLastSyncTime();
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Erro ao buscar sincronização do localStorage:', e);
+            }
+        }
+
+        function createNewBin(sessionId, data) {
+            return fetch('https://api.jsonbin.io/v3/b', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Bin-Name': `battle-aliados-${sessionId}`,
+                    'X-Bin-Private': 'false'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                return res.json();
+            })
+            .then(result => {
+                if (result.metadata && result.metadata.id) {
+                    const binId = result.metadata.id;
+                    localStorage.setItem(`bin_id_${sessionId}`, binId);
+                    console.log('Bin criado com sucesso:', binId);
+                    return binId;
+                } else {
+                    throw new Error('Resposta inválida do JSONBin.io');
+                }
+            })
+            .catch(err => {
+                console.error('Erro ao criar bin no JSONBin.io:', err);
+                console.log('Usando apenas localStorage para sincronização');
+                return null;
+            });
         }
 
         function checkUrlSync() {
@@ -868,6 +935,25 @@
             localStorage.setItem(storageKey, shareData);
             localStorage.setItem(`${storageKey}_timestamp`, Date.now().toString());
             
+            // Criar/atualizar bin no JSONBin.io para sincronização pública
+            let binId = localStorage.getItem(`bin_id_${sessionId}`);
+            if (!binId) {
+                createNewBin(sessionId, data);
+            } else {
+                // Atualizar bin existente
+                fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Bin-Private': 'false'
+                    },
+                    body: jsonStr
+                }).catch(() => {
+                    // Se falhar, tentar criar novo
+                    createNewBin(sessionId, data);
+                });
+            }
+            
             // Criar link apenas com ID de sessão (sem dados na URL)
             const shareUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(sessionId)}`;
             
@@ -936,7 +1022,7 @@
                         'X-Bin-Name': `battle-aliados-${sessionId}`,
                         'X-Bin-Private': 'false'
                     },
-                    body: JSON.stringify(data)
+                    body: jsonStr
                 });
                 
                 if (binResponse.ok) {
@@ -948,10 +1034,15 @@
                         alert(`Link de compartilhamento copiado!\n\nCompartilhe este link com outros jogadores:\n${shareUrl}\n\nBin público criado para sincronização automática.`);
                     });
                 } else {
+                    const errorData = await binResponse.json().catch(() => ({}));
+                    console.error('Erro ao criar bin:', errorData);
                     throw new Error('Falha ao criar bin');
                 }
             } catch (e) {
-                // Se falhar, usar apenas localStorage compartilhado
+                // Se falhar, tentar criar via função helper
+                console.log('Tentando criar bin via função helper...', e);
+                createNewBin(sessionId, data);
+                
                 navigator.clipboard.writeText(shareUrl).then(() => {
                     alert(`Link de compartilhamento copiado!\n\nCompartilhe este link com outros jogadores:\n${shareUrl}\n\nNota: Ative a sincronização automática para receber atualizações em tempo real.`);
                 }).catch(() => {
