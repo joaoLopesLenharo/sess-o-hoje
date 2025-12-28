@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ivorykeep: A Queda de Engrenagem | War System T20</title>
+    <title>Aliados - Queda de Engrenagem | War System T20</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,12 +12,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Roboto+Mono:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        ivory: { 900: '#1a1a1a', 800: '#2d2d2d', accent: '#e6b800', tech: '#4db6ac', enemy: '#ef4444' }
+                        ivory: { 900: '#1a1a1a', 800: '#2d2d2d', accent: '#e6b800', tech: '#4db6ac' }
                     },
                     fontFamily: { 'cinzel': ['Cinzel', 'serif'], 'mono': ['Roboto Mono', 'monospace'], 'sans': ['Inter', 'sans-serif'] }
                 }
@@ -26,96 +27,1118 @@
     </script>
 
     <style>
-        body { 
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            color: #e2e8f0; 
-            min-height: 100vh;
+        body { background-color: #0f172a; color: #e2e8f0; }
+        .card-glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .npc-dead { filter: grayscale(100%) brightness(50%); border-color: #334155 !important; }
+        .npc-dead h4, .npc-dead .passive-text { text-decoration: line-through; color: #64748b; }
+        .npc-dead .buff-tag { background-color: #450a0a !important; color: #fca5a5 !important; text-decoration: line-through; border-color: #7f1d1d !important; }
+        
+        .squad-card { cursor: pointer; transition: all 0.2s; }
+        .squad-card:hover { transform: translateY(-2px); border-color: #e6b800; }
+        
+        .modal-enter { animation: modalIn 0.3s ease-out forwards; }
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
         }
-        .card-glass { 
-            background: rgba(30, 41, 59, 0.7); 
-            backdrop-filter: blur(10px); 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+
+        .sync-indicator {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
-        .card-hover {
-            transition: all 0.3s ease;
-        }
-        .card-hover:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
     </style>
 </head>
-<body class="font-sans antialiased min-h-screen flex flex-col items-center justify-center p-4">
-    
-    <div class="max-w-4xl w-full space-y-8">
+<body class="font-sans antialiased min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-slate-900 border-b border-slate-700 sticky top-0 z-50 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center flex-wrap gap-3">
+            <div class="flex items-center gap-3">
+                <button id="btn-back" onclick="showDashboard()" class="hidden text-ivory-accent hover:text-white transition">
+                    <i class="fa-solid fa-arrow-left text-xl"></i>
+                </button>
+                <div>
+                    <h1 class="font-cinzel text-xl text-ivory-accent font-bold tracking-wider">
+                        <i class="fa-solid fa-shield-halved mr-2"></i>FORÇAS DA RESISTÊNCIA
+                    </h1>
+                    <p class="text-slate-400 text-xs font-mono uppercase">Sistema de Batalha - Ano 3425</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+                <div class="flex gap-1 bg-slate-800 p-1 rounded-lg border border-slate-700">
+                    <button onclick="setTension(1)" id="btn-nt-1" class="px-3 py-1 rounded text-xs font-bold transition-colors">NT 1</button>
+                    <button onclick="setTension(2)" id="btn-nt-2" class="px-3 py-1 rounded text-xs font-bold transition-colors">NT 2</button>
+                    <button onclick="setTension(3)" id="btn-nt-3" class="px-3 py-1 rounded text-xs font-bold transition-colors">NT 3</button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="exportData()" class="px-3 py-1.5 rounded text-xs font-bold bg-green-600 hover:bg-green-700 text-white transition-colors flex items-center gap-2" title="Exportar dados para compartilhar">
+                        <i class="fa-solid fa-download"></i>
+                        Exportar
+                    </button>
+                    <button onclick="importData()" class="px-3 py-1.5 rounded text-xs font-bold bg-purple-600 hover:bg-purple-700 text-white transition-colors flex items-center gap-2" title="Importar dados compartilhados">
+                        <i class="fa-solid fa-upload"></i>
+                        Importar
+                    </button>
+                    <button onclick="toggleAutoSync()" id="btn-sync" class="px-3 py-1.5 rounded text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center gap-2" title="Sincronização automática na nuvem">
+                        <i class="fa-solid fa-cloud-arrow-up"></i>
+                        <span id="sync-status">Auto Sync</span>
+                    </button>
+                    <div id="sync-indicator" class="hidden w-2 h-2 rounded-full bg-green-500 sync-indicator"></div>
+                    <button onclick="showSyncModal()" class="px-2 py-1.5 rounded text-xs font-bold bg-slate-700 hover:bg-slate-600 text-white transition-colors" title="Configurar sincronização">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div id="tension-display" class="bg-slate-800/80 border-b border-slate-700 px-4 py-2 text-center text-xs">
+            <span id="tension-desc" class="text-slate-300"></span>
+        </div>
+    </header>
+
+    <main class="flex-grow p-4 max-w-7xl mx-auto w-full relative">
         
-        <!-- Header -->
-        <header class="text-center mb-12">
-            <h1 class="font-cinzel text-5xl md:text-6xl text-ivory-accent font-bold tracking-wider mb-4">
-                <i class="fa-solid fa-shield-halved mr-3"></i>QUEDA DE ENGRENAGEM
-            </h1>
-            <p class="text-slate-400 text-sm font-mono uppercase tracking-widest">War System T20 - Ano 3425</p>
-            <div class="mt-4 h-1 w-24 bg-ivory-accent mx-auto"></div>
-        </header>
-
-        <!-- Cards de Navegação -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- DASHBOARD -->
+        <div id="view-dashboard" class="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
             
-            <!-- Aliados -->
-            <a href="aliados.html" class="card-glass rounded-xl p-8 border-t-4 border-green-500 card-hover group">
-                <div class="flex items-start justify-between mb-4">
-                    <div class="w-16 h-16 bg-green-500/20 rounded-lg flex items-center justify-center border border-green-500/30 group-hover:bg-green-500/30 transition-colors">
-                        <i class="fa-solid fa-shield-halved text-3xl text-green-400"></i>
+            <!-- LEFT: SQUADS LIST -->
+            <section class="lg:col-span-7 space-y-6">
+                
+                <!-- ALLIES -->
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h2 class="font-cinzel text-lg text-slate-200 flex items-center gap-2">
+                            <i class="fa-solid fa-chess-rook text-ivory-tech"></i> Esquadrões Aliados
+                            <span class="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-500 border border-slate-700">Heróis de 3425</span>
+                        </h2>
+                        <div class="text-xs text-slate-500">
+                            <span id="last-sync-time"></span>
+                        </div>
                     </div>
-                    <i class="fa-solid fa-arrow-right text-slate-400 group-hover:text-green-400 transition-colors"></i>
+                    <div id="squad-list-allies" class="space-y-3"></div>
                 </div>
-                <h2 class="font-cinzel text-2xl text-green-400 font-bold mb-2">Forças da Resistência</h2>
-                <p class="text-slate-400 text-sm mb-4">Gerencie os esquadrões aliados com sincronização automática na nuvem para múltiplos jogadores.</p>
-                <div class="flex flex-wrap gap-2">
-                    <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/30">Sincronização</span>
-                    <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/30">Multiplayer</span>
-                    <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded border border-green-500/30">GitHub Pages</span>
-                </div>
-            </a>
 
-            <!-- Inimigos -->
-            <a href="inimigos.html" class="card-glass rounded-xl p-8 border-t-4 border-red-500 card-hover group">
-                <div class="flex items-start justify-between mb-4">
-                    <div class="w-16 h-16 bg-red-500/20 rounded-lg flex items-center justify-center border border-red-500/30 group-hover:bg-red-500/30 transition-colors">
-                        <i class="fa-solid fa-skull text-3xl text-red-400"></i>
+            </section>
+
+            <!-- RIGHT: COMMAND & ACTIONS -->
+            <section class="lg:col-span-5 space-y-6">
+                
+                <!-- TACTICAL ACTIONS -->
+                <div class="card-glass rounded-xl p-4 border-t-4 border-blue-500">
+                    <h2 class="font-cinzel text-lg text-slate-200 mb-3">
+                        <i class="fa-solid fa-gavel mr-2 text-blue-400"></i>Ordens Táticas
+                    </h2>
+                    <div class="grid grid-cols-1 gap-2 mb-4">
+                        <button onclick="selectAction('ATQ')" class="btn-action bg-slate-800 hover:bg-slate-700 border border-slate-600 p-3 rounded text-left group transition-all">
+                            <div class="font-bold text-red-300 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-crosshairs"></i>COORDENAR FOGO
+                            </div>
+                            <div class="text-[10px] text-slate-400 opacity-70 group-hover:opacity-100 mt-1">+2 Ataque. +4d6 Dano (Flanqueio).</div>
+                        </button>
+                        <button onclick="selectAction('DEF')" class="btn-action bg-slate-800 hover:bg-slate-700 border border-slate-600 p-3 rounded text-left group transition-all">
+                            <div class="font-bold text-blue-300 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-shield"></i>LINHA DE DEFESA
+                            </div>
+                            <div class="text-[10px] text-slate-400 opacity-70 group-hover:opacity-100 mt-1">+5 Defesa. Cobertura Total.</div>
+                        </button>
+                        <button onclick="selectAction('MOV')" class="btn-action bg-slate-800 hover:bg-slate-700 border border-slate-600 p-3 rounded text-left group transition-all">
+                            <div class="font-bold text-amber-300 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-person-running"></i>REPOSICIONAR
+                            </div>
+                            <div class="text-[10px] text-slate-400 opacity-70 group-hover:opacity-100 mt-1">Deslocamento Dobrado. Foge de Combate.</div>
+                        </button>
+                        <button onclick="selectAction('ESP')" class="btn-action bg-slate-800 hover:bg-slate-700 border border-slate-600 p-3 rounded text-left group transition-all">
+                            <div class="font-bold text-purple-300 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i>RITUAL DE GUERRA
+                            </div>
+                            <div class="text-[10px] text-slate-400 opacity-70 group-hover:opacity-100 mt-1">Recupera 1 Baixa ou Buff em Área.</div>
+                        </button>
                     </div>
-                    <i class="fa-solid fa-arrow-right text-slate-400 group-hover:text-red-400 transition-colors"></i>
                 </div>
-                <h2 class="font-cinzel text-2xl text-red-400 font-bold mb-2">Tropas do Barão</h2>
-                <p class="text-slate-400 text-sm mb-4">Controle as forças inimigas localmente. Ideal para uso do mestre durante a sessão.</p>
-                <div class="flex flex-wrap gap-2">
-                    <span class="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded border border-red-500/30">Local</span>
-                    <span class="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded border border-red-500/30">Mestre</span>
-                    <span class="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded border border-red-500/30">Privado</span>
-                </div>
-            </a>
 
+                <!-- STATUS SUMMARY -->
+                <div class="card-glass rounded-xl p-4 border-t-4 border-green-500">
+                    <h2 class="font-cinzel text-lg text-slate-200 mb-3">
+                        <i class="fa-solid fa-chart-line mr-2 text-green-400"></i>Resumo Tático
+                    </h2>
+                    <div id="status-summary" class="space-y-2 text-sm">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+            </section>
         </div>
 
-        <!-- Informações -->
-        <div class="card-glass rounded-xl p-6 border border-slate-700">
-            <h3 class="font-cinzel text-lg text-slate-200 mb-3 flex items-center gap-2">
-                <i class="fa-solid fa-circle-info text-ivory-tech"></i> Informações
-            </h3>
-            <div class="space-y-2 text-sm text-slate-400">
-                <p><strong class="text-slate-300">Página de Aliados:</strong> Sincronização automática na nuvem. Compartilhe o link com seus jogadores para visualização em tempo real.</p>
-                <p><strong class="text-slate-300">Página de Inimigos:</strong> Uso local apenas. Mantenha privado durante a sessão.</p>
+        <!-- SQUAD DETAIL VIEW -->
+        <div id="view-squad-detail" class="hidden animate-fade-in pb-10">
+            <div id="squad-detail-header" class="mb-6"></div>
+            <div id="squad-detail-npcs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+        </div>
+
+        <!-- LORE MODAL -->
+        <div id="lore-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4" onclick="closeLoreModal()">
+            <div class="bg-slate-900 border border-ivory-accent rounded-xl max-w-lg w-full p-6 relative shadow-2xl modal-enter max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                <button onclick="closeLoreModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+                <div id="lore-content"></div>
             </div>
         </div>
 
-        <!-- Footer -->
-        <footer class="text-center text-xs text-slate-500 mt-8">
-            <p>Ivorykeep: A Queda de Engrenagem | Sistema de Batalha T20</p>
-            <p class="mt-1">Ano 3425 - Todos os direitos reservados</p>
-        </footer>
+        <!-- SYNC CONFIG MODAL -->
+        <div id="sync-modal" class="fixed inset-0 z-[100] hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4" onclick="closeSyncModal()">
+            <div class="bg-slate-900 border border-blue-500 rounded-xl max-w-lg w-full p-6 relative shadow-2xl modal-enter" onclick="event.stopPropagation()">
+                <button onclick="closeSyncModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
+                <h3 class="font-cinzel text-xl text-blue-400 font-bold mb-4">Configuração de Sincronização</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-slate-300 mb-2">ID da Sessão Compartilhada</label>
+                        <input type="text" id="sync-session-id" placeholder="Ex: batalha-3425" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500" />
+                        <p class="text-xs text-slate-500 mt-1">Use o mesmo ID para sincronizar entre múltiplos jogadores</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-300 mb-2">URL do Endpoint Público (opcional)</label>
+                        <input type="text" id="sync-endpoint" placeholder="Deixe vazio para usar serviço padrão" class="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500" />
+                        <p class="text-xs text-slate-500 mt-1">URL de um arquivo JSON público ou endpoint de API</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="saveSyncConfig()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-bold transition-colors">
+                            Salvar
+                        </button>
+                        <button onclick="generateShareLink()" class="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-bold transition-colors">
+                            Gerar Link
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-    </div>
+    </main>
 
+    <script>
+        // --- SYNC CONFIGURATION ---
+        let syncEnabled = false;
+        let syncInterval = null;
+        let syncSessionId = null;
+        let syncEndpoint = null;
+        let lastSyncHash = null;
+
+        // Funções helper para codificação/decodificação Unicode-safe
+        function encodeBase64(str) {
+            try {
+                return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(match, p1) {
+                    return String.fromCharCode('0x' + p1);
+                }));
+            } catch (e) {
+                // Fallback: usar apenas encodeURIComponent
+                return encodeURIComponent(str);
+            }
+        }
+
+        function decodeBase64(str) {
+            try {
+                return decodeURIComponent(atob(str).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+            } catch (e) {
+                // Fallback: tentar decodificar como URI
+                try {
+                    return decodeURIComponent(str);
+                } catch (e2) {
+                    return str;
+                }
+            }
+        }
+
+        // Função para gerar hash simples de string
+        function simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            return Math.abs(hash).toString(16);
+        }
+
+        // --- DATA ---
+        const defaultSquads = [
+            {
+                id: 1, isEnemy: false,
+                name: "Resistência Central",
+                role: "Proteção & Controle",
+                desc: "A linha tênue entre a sobrevivência e o esquecimento. Não lutam por glória, mas para proteger o que restou de suas almas.",
+                color: "text-green-400",
+                baseStats: { atk: 18, def: 25, dmgDice: "1d8", dmgFlat: 8, init: 5 }, 
+                damageType: "Biorrobótica/Explosivo",
+                npcs: [
+                    { 
+                        name: "Clarice Lins", role: "Líder Artífice", dead: false, 
+                        passive: "Biorrobótica Arcana: O Esquadrão possui RD 10 (físico/mágico) devido aos escudos de campo gerados por Clarice.", 
+                        buffs: { def: 4, atk: 0, dmg: 0, desc: "+4 DEF/RD 10 (Escudo de Campo)" },
+                        lore: "Clarice é uma mestra na manipulação de metal e magia, mas nenhuma de suas invenções foi capaz de impedir a tragédia que abateu sua família. Após ser deixada por Cedric e ver seu filho Igor ser transformado em um Osteon, ela canalizou sua genialidade para um único propósito: a biorrobótica arcana. Ela não lidera por carisma maternal, mas por competência técnica."
+                    },
+                    { 
+                        name: "Karn (Antigo Silas)", role: "Armadura Animada", dead: false, 
+                        passive: "Redenção de Ferro: Karn intercepta ataques letais. Uma vez por rodada, anula um acerto crítico contra o esquadrão.", 
+                        buffs: { def: 4, atk: 0, dmg: 0, desc: "+4 DEF (Corpo Metálico)" },
+                        lore: "Karn é uma armadura animada que vaga com o peso de memórias que não são inteiramente suas. Ele carrega fragmentos da consciência de um soldado que falhou em proteger sua própria família em uma guerra esquecida. Ao encontrar Clarice, ele viu nela a chance de redenção que a morte lhe negou. Ele permite que Clarice conserte suas placas amassadas, não para se manter forte, mas para garantir que ele possa ser o escudo que ela precisa."
+                    },
+                    { 
+                        name: "Elian", role: "Demolidor", dead: false, 
+                        passive: "Arte Explosiva: Ataques causam dano em área (Reflexos CD 25 reduz metade). O caos é sua forma de controle.", 
+                        buffs: { def: 0, atk: 0, dmg: 5, desc: "+1d10 Dano (Bombas)" },
+                        lore: "Elian ri quando as coisas explodem porque o silêncio o aterroriza. Expulso de casa e rotulado como perigoso, ele encontrou na destruição uma forma de controle. Ele cria bombas complexas e belas como obras de arte, a única linguagem que ele conhece para expressar a raiva de ter sido descartado pelo mundo. Na Resistência, ele encontrou um lugar onde seu 'talento' é útil, mas no fundo, ele espera que um dia alguém olhe através da fumaça e veja a criança assustada que só queria ser aceita."
+                    },
+                    { 
+                        name: "Lysandra", role: "Abjuradora", dead: false, 
+                        passive: "Vigilância Constante: O grupo nunca é surpreendido e recebe +5 em Testes de Vontade contra Medo.", 
+                        buffs: { def: 2, atk: 0, dmg: 0, desc: "+2 DEF/Imun. Surpresa" },
+                        lore: "Lysandra sobreviveu a um massacre porque olhou para trás quando ninguém mais olhou. Agora, ela não consegue parar de olhar. Sua magia de abjuração é alimentada por um terror constante; ela desenha círculos de proteção obsessivamente, verificando cada sombra, cada sussurro. Ela não dorme, ela vigia. Sua frieza tática é uma armadura para impedir que ela se apegue a pessoas que, em sua mente traumatizada, já estão mortas."
+                    },
+                    { 
+                        name: "Nia", role: "Logística", dead: false, 
+                        passive: "Contrabando Vital: Uma vez por cena, o esquadrão recupera 1 PV (ressuscita um membro com 1 PV) ou reabastece PMs.", 
+                        buffs: { def: 0, atk: 0, dmg: 3, desc: "+3 Dano (Suprimentos)" },
+                        lore: "Nia corre porque parar significa lembrar. Órfã das ruas cruéis de Ivorykeep, ela aprendeu que a compaixão é um luxo que os pobres não podem pagar. No entanto, ela arrisca a vida contrabandeando remédios, uma contradição que ela se recusa a explicar. Cada entrega bem-sucedida é uma pequena vitória contra a fome que levou seus pais. Ela não luta pela Resistência; ela luta para que nenhuma outra criança tenha que correr tanto quanto ela."
+                    }
+                ]
+            },
+            {
+                id: 2, isEnemy: false,
+                name: "Vanguarda Tecnológica",
+                role: "Precisão & Anti-Blindagem",
+                desc: "Brilhantes, ambiciosos e quebrados. Buscam no progresso as respostas que o coração não dá.",
+                color: "text-cyan-400",
+                baseStats: { atk: 24, def: 20, dmgDice: "1d10", dmgFlat: 10, init: 15 },
+                damageType: "Perfurante (Adamante)",
+                npcs: [
+                    { 
+                        name: "Marie Meucci", role: "Engenheira", dead: false, 
+                        passive: "Frequência de Ressonância: Ignora totalmente a RD de Construtos e Objetos.", 
+                        buffs: { def: 0, atk: 3, dmg: 0, desc: "+3 ATK (Mira Tech)" },
+                        lore: "Marie é celebrada como a mente mais brilhante da Academia, mas seu laboratório é um santuário para uma memória. Cada invenção revolucionária carrega um traço sutil de sua infância com Oren Lins. Ela se enterrou no trabalho para abafar o silêncio da ausência dele. Marie acredita que se ela puder decifrar os segredos da tecnologia antiga e 'consertar' o mundo, talvez ela possa criar um lugar seguro o suficiente para que seu amigo volte para casa."
+                    },
+                    { 
+                        name: "Tork", role: "Escudo Vivo", dead: false, 
+                        passive: "Sacrifício Silencioso: Se Marie sofreria dano letal, Tork morre automaticamente no lugar dela.", 
+                        buffs: { def: 3, atk: 0, dmg: 0, desc: "+3 DEF (Guarda-Costas)" },
+                        lore: "Um mercenário cuja aparência brutal esconde uma alma cansada de violência. Tork aceitou o contrato de proteger Marie não pelo dinheiro, mas porque viu nela alguém tão frágil quanto a flor que ele guarda seca dentro de um medalhão. Ele age como uma barreira física impenetrável, absorvendo golpes e insultos com estoicismo, pois sabe que a mente de Marie é um tesouro que o mundo tentará quebrar."
+                    },
+                    { 
+                        name: "Aeris", role: "Atirador Élfico", dead: false, 
+                        passive: "Lente Telescópica: Alcance dos ataques é dobrado. Críticos x4.", 
+                        buffs: { def: 0, atk: 4, dmg: 0, desc: "+4 ATK (Precisão)" },
+                        lore: "Aeris trocou as florestas sagradas de Sylvan pelo aço frio de um rifle modificado. Rejeitado por seu povo por sua obsessão com a tecnologia humana, ele transformou sua solidão em arrogância. Ele olha o mundo através de uma lente telescópica, a única distância segura para ele interagir com os outros. Ele segue Marie porque ela é a única que entende a beleza da precisão mecânica."
+                    },
+                    { 
+                        name: "Dr. Aris Thorne", role: "Médico Radical", dead: false, 
+                        passive: "Solução Definitiva: Críticos curam o esquadrão em 5 PV (drenando vida do alvo).", 
+                        buffs: { def: 0, atk: 0, dmg: 5, desc: "+5 Dano (Anatomia)" },
+                        lore: "Dr. Aris Thorne não é movido pela crueldade, mas por um desespero profundo nascido de anos vendo pacientes morrerem porque a magia era proibida ou instável. Cada perda corroeu sua fé, transformando culpa em uma obsessão silenciosa por encontrar uma solução definitiva através da ciência, acreditando que certos sacrifícios são aceitáveis se significarem o fim da morte sem sentido."
+                    },
+                    { 
+                        name: "Cipher", role: "IA Tática", dead: false, 
+                        passive: "Algoritmo de Previsão: Inimigos Tecnológicos rolam 2 dados de ataque e ficam com o pior.", 
+                        buffs: { def: 2, atk: 0, dmg: 0, desc: "+2 DEF (Interferência)" },
+                        lore: "Cipher sabe tudo sobre a história do mundo, mas não entende o que é sentir o vento no rosto. Ele é uma inteligência artificial que vive nas sombras dos dados. Sua lealdade a Marie é absoluta, pois ela o trata como um indivíduo. Ele imita comportamentos humanos — uma pausa na fala, uma gíria — numa tentativa dolorosa e cativante de pertencer a um mundo biológico que ele só pode observar."
+                    }
+                ]
+            },
+            {
+                id: 3, isEnemy: false,
+                name: "Vanguarda Tática",
+                role: "Mobilidade & Explosão",
+                desc: "Guerreiros forjados na dor da perda, transformando seu luto em armas para garantir um amanhã.",
+                color: "text-indigo-400",
+                baseStats: { atk: 22, def: 28, dmgDice: "2d6", dmgFlat: 6, init: 20 },
+                damageType: "Impacto/Caos",
+                npcs: [
+                    { 
+                        name: "Xar", role: "Líder Estrategista", dead: false, 
+                        passive: "Peso da Liderança: O Esquadrão tem uma Ação de Movimento extra todo turno.", 
+                        buffs: { def: 0, atk: 3, dmg: 0, desc: "+3 ATK (Comando)" },
+                        lore: "Xar carrega o peso de uma raça inteira sobre os ombros. Ele endureceu o próprio coração para se tornar o líder implacável de que a rebelião precisa, mas cada vida perdida sob seu comando abre uma nova ferida em sua alma. Xar ama Ray desesperadamente, e é esse amor que mais o aterroriza — pois ele sabe que, em uma guerra como a sua, o amor é sempre a primeira coisa a se perder."
+                    },
+                    { 
+                        name: "Ray", role: "Escudo Radiante", dead: false, 
+                        passive: "Dança da Distração: O Esquadrão é imune a Ataques de Oportunidade e +5 DEF contra ataques à distância.", 
+                        buffs: { def: 3, atk: 0, dmg: 0, desc: "+3 DEF (Esquiva)" },
+                        lore: "Ray luta com um sorriso radiante, mas seus olhos estão sempre atentos, voltados para Xar a cada instante. Ela se tornou mestra da distração e da defesa para ser o escudo que ele se recusa a empunhar. Sua alegria em combate é uma atuação; Ray sangra e se exaure para que Xar possa manter as mãos limpas e a mente focada."
+                    },
+                    { 
+                        name: "Vi", role: "Lutadora", dead: false, 
+                        passive: "Punhos da Fúria: Se o ataque do esquadrão errar por 5 ou menos, causa metade do dano.", 
+                        buffs: { def: 0, atk: 0, dmg: 4, desc: "+4 Dano (Força)" },
+                        lore: "Vi cresceu nas ruas duras e esquecidas, onde a violência é tanto linguagem quanto sobrevivência. Forjada pela perda e pela injustiça, ela luta com fúria e lealdade inabaláveis. Por trás da postura explosiva e do humor provocador, Vi carrega culpa, saudade e o medo constante de falhar novamente — pois, em um mundo quebrado, cada soco que ela dá é também uma tentativa desesperada de consertar o que foi destruído."
+                    },
+                    { 
+                        name: "Selene", role: "Clériga Sombria", dead: false, 
+                        passive: "Fardo Moral: Inimigos atingidos sofrem -2 em testes de resistência até o fim da rodada.", 
+                        buffs: { def: 2, atk: 0, dmg: 0, desc: "+2 DEF (Debuff)" },
+                        lore: "Selene vive o paradoxo doloroso de sua fé: para salvar os inocentes, ela precisa quebrar os culpados. Ela abandonou a passividade do templo quando percebeu que as preces não paravam espadas. Cada vez que ela usa sua magia para debilitar um inimigo, ela sente um pedaço de sua própria espiritualidade se fragmentar. Ela carrega o fardo moral do grupo, orando pelo perdão de todos eles nas noites insones."
+                    },
+                    { 
+                        name: "Jinx", role: "Artilharia Caótica", dead: false, 
+                        passive: "Super Mega Míssil: Uma vez por cena, causa dano máximo em área sem rolar dados.", 
+                        buffs: { def: 2, atk: 0, dmg: 0, desc: "+2 DEF (Imprevisibilidade)" },
+                        lore: "Jinx é o resultado de um mundo que a despedaçou cedo demais. Criada entre ruínas, perdas e promessas quebradas, sua mente se fragmentou. Impulsiva e genial, ela enxerga o mundo como um palco de explosões e desafios, usando a destruição como forma de afirmar sua existência. Por trás da insanidade vibrante, Jinx carrega uma carência profunda e um desejo desesperado de ser aceita."
+                    }
+                ]
+            },
+            {
+                id: 4, isEnemy: false,
+                name: "Frente Mágica",
+                role: "Dano Mágico & Suporte",
+                desc: "Viajantes de estradas solitárias, unidos por um homem que busca um fantasma através de mistérios.",
+                color: "text-purple-400",
+                baseStats: { atk: 20, def: 18, dmgDice: "6d6", dmgFlat: 0, init: 8 },
+                damageType: "Essência Pura",
+                npcs: [
+                    { 
+                        name: "Theo", role: "Buscador Arcano", dead: false, 
+                        passive: "Obsessão Arcana: Todo dano causado é Essência (ignora RD). Se errar o ataque, Theo perde 2 PV (dano mental).", 
+                        buffs: { def: 0, atk: 2, dmg: 5, desc: "+2 ATK/+5 Dano" },
+                        lore: "A alegria de Theo é contagiante, mas é uma máscara fina sobre um abismo de desespero. Sua esposa não morreu; ela simplesmente desapareceu em um piscar de olhos durante um ritual. Theo viaja o mundo não por aventura, mas porque não consegue ficar parado na casa vazia. Ele persegue lendas com um fervor maníaco, aterrorizado com a ideia de que, se parar de procurar, estará admitindo que ela se foi para sempre."
+                    },
+                    { 
+                        name: "Lyra", role: "Protetora Acrobata", dead: false, 
+                        passive: "Rede de Segurança: +5 na Defesa do esquadrão contra ataques de área.", 
+                        buffs: { def: 3, atk: 0, dmg: 0, desc: "+3 DEF (Acrobacia)" },
+                        lore: "Lyra cresceu no circo, onde a confiança é a diferença entre o espetáculo e a morte. Quando perdeu sua trupe, perdeu seu chão. Em Theo, ela viu outro artista solitário atuando para esconder a dor. Ela protege a retaguarda não apenas taticamente, mas emocionalmente; ela é a única que percebe quando o sorriso de Theo vacila."
+                    },
+                    { 
+                        name: "Milo", role: "Guerreiro Honrado", dead: false, 
+                        passive: "Desafio Justo: O Esquadrão ganha +5 de Dano contra inimigos que já causaram dano na rodada.", 
+                        buffs: { def: 0, atk: 2, dmg: 2, desc: "+2 ATK/Dano" },
+                        lore: "Milo é um guerreiro de honra absoluta, guiado por um senso inabalável de justiça. Ele acredita que a verdadeira força não está apenas no poder, mas na determinação de proteger. Suas batalhas não são movidas por crueldade, mas por convicção: Milo luta para provar o valor dos outros e o próprio, mantendo-se fiel a seus ideais mesmo quando o mundo ao seu redor vacila."
+                    },
+                    { 
+                        name: "Kaelith", role: "Caçadora Elfa", dead: false, 
+                        passive: "Fúria Suicida: Se o esquadrão estiver com menos de 3 membros (Bloodied), causa +1 dado de dano.", 
+                        buffs: { def: 0, atk: 1, dmg: 0, desc: "+1 ATK" },
+                        lore: "Kaelith luta como se já estivesse morta. A perda de seu irmão gêmeo cortou sua conexão com a alegria da vida élfica. Ela busca monstros terríveis não por bravura, mas na esperança de encontrar um desafio que finalmente a silencie. Ela vê na busca impossível de Theo um reflexo de sua própria jornada sem fim."
+                    },
+                    { 
+                        name: "Aldous Beker", role: "Alquimista Ancião", dead: false, 
+                        passive: "Última Mistura: Cura 5 PV por rodada no esquadrão. Se morrer, cura todo o esquadrão completamente (Último Suspiro).", 
+                        buffs: { def: 0, atk: 0, dmg: 0, desc: "Regen 5 PV" },
+                        lore: "Beker é velho, e seus ossos doem com o peso de décadas de falhas. Ele passou a vida buscando a 'Panaceia', a cura para tudo, e falhou. Ao ver a dor de Theo, ele encontrou um novo propósito final. Se não pode curar o corpo do mundo, talvez possa ajudar um homem a curar seu coração. Ele usa suas últimas energias para manter esses jovens vivos."
+                    }
+                ]
+            }
+        ];
+
+        let squads = [];
+
+        // --- STORAGE & SYNC ---
+        function loadSquads() {
+            const stored = localStorage.getItem('aliados_squads');
+            if (stored) {
+                try {
+                    squads = JSON.parse(stored);
+                } catch (e) {
+                    squads = JSON.parse(JSON.stringify(defaultSquads));
+                }
+            } else {
+                squads = JSON.parse(JSON.stringify(defaultSquads));
+            }
+        }
+
+        function saveSquads() {
+            localStorage.setItem('aliados_squads', JSON.stringify(squads));
+            localStorage.setItem('aliados_last_save', new Date().toISOString());
+            updateLastSyncTime();
+            
+            // Sincronizar automaticamente se habilitado
+            if (syncEnabled) {
+                syncToCloud();
+            }
+        }
+
+        function syncToCloud() {
+            if (!syncSessionId) return;
+
+            const data = {
+                squads: squads,
+                timestamp: new Date().toISOString(),
+                sessionId: syncSessionId,
+                version: '1.0'
+            };
+
+            const jsonStr = JSON.stringify(data);
+            const hash = simpleHash(jsonStr).substring(0, 16);
+            
+            // Se não mudou, não precisa sincronizar
+            if (hash === lastSyncHash) return;
+            lastSyncHash = hash;
+
+            const storageKey = `battle_aliados_${syncSessionId}`;
+            
+            if (syncEndpoint) {
+                // Usar endpoint customizado
+                fetch(syncEndpoint, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).catch(err => console.log('Sync error:', err));
+            } else {
+                // Usar sistema de compartilhamento baseado em URL pública
+                // Armazenar em localStorage e criar link compartilhável
+                try {
+                    const jsonStr = JSON.stringify(data);
+                    const shareData = encodeBase64(jsonStr);
+                    localStorage.setItem(storageKey, shareData);
+                    localStorage.setItem(`${storageKey}_timestamp`, Date.now().toString());
+                    
+                    // Criar link compartilhável com dados codificados
+                    const shareUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(syncSessionId)}&data=${encodeURIComponent(shareData)}`;
+                    sessionStorage.setItem('share_url', shareUrl);
+                    
+                    // Tentar usar um serviço público de armazenamento (JSONBin.io)
+                    // Nota: Requer criar um bin público primeiro via generateShareLink
+                    const binId = localStorage.getItem(`bin_id_${syncSessionId}`);
+                    if (binId) {
+                        // Atualizar bin existente
+                        fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Master-Key': '$2b$10$dummy' // Bin público não precisa de key real
+                            },
+                            body: JSON.stringify(data)
+                        }).catch(() => {
+                            // Se falhar, continuar com localStorage
+                        });
+                    }
+                } catch (e) {
+                    console.error('Erro ao sincronizar:', e);
+                }
+            }
+        }
+
+        function syncFromCloud() {
+            if (!syncSessionId) return;
+
+            const storageKey = `battle_aliados_${syncSessionId}`;
+            
+            if (syncEndpoint) {
+                // Buscar de endpoint customizado
+                fetch(syncEndpoint + '?t=' + Date.now())
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.squads && data.sessionId === syncSessionId) {
+                            const jsonStr = JSON.stringify(data);
+                            const remoteHash = simpleHash(jsonStr).substring(0, 16);
+                            if (remoteHash !== lastSyncHash) {
+                                squads = data.squads;
+                                saveSquads();
+                                renderSquads();
+                                renderStatusSummary();
+                                lastSyncHash = remoteHash;
+                                updateLastSyncTime();
+                            }
+                        }
+                    })
+                    .catch(err => console.log('Sync fetch error:', err));
+            } else {
+                // Buscar de localStorage compartilhado
+                try {
+                    const shareData = localStorage.getItem(storageKey);
+                    const remoteTimestamp = parseInt(localStorage.getItem(`${storageKey}_timestamp`) || '0');
+                    const localTimestamp = parseInt(localStorage.getItem(`local_${storageKey}_timestamp`) || '0');
+                    
+                    if (shareData && remoteTimestamp > localTimestamp) {
+                        const decodedData = decodeBase64(shareData);
+                        const data = JSON.parse(decodedData);
+                        if (data.squads && data.sessionId === syncSessionId) {
+                            const jsonStr = JSON.stringify(data);
+                            const remoteHash = simpleHash(jsonStr).substring(0, 16);
+                            if (remoteHash !== lastSyncHash) {
+                                squads = data.squads;
+                                saveSquads();
+                                renderSquads();
+                                renderStatusSummary();
+                                lastSyncHash = remoteHash;
+                                localStorage.setItem(`local_${storageKey}_timestamp`, remoteTimestamp.toString());
+                                updateLastSyncTime();
+                            }
+                        }
+                    }
+                    
+                    // Tentar buscar de JSONBin.io se configurado
+                    const binId = localStorage.getItem(`bin_id_${syncSessionId}`);
+                    if (binId) {
+                        fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`)
+                            .then(res => res.json())
+                            .then(result => {
+                                if (result.record && result.record.squads && result.record.sessionId === syncSessionId) {
+                                    const data = result.record;
+                                    const jsonStr = JSON.stringify(data);
+                                    const remoteHash = simpleHash(jsonStr).substring(0, 16);
+                                    if (remoteHash !== lastSyncHash) {
+                                        squads = data.squads;
+                                        saveSquads();
+                                        renderSquads();
+                                        renderStatusSummary();
+                                        lastSyncHash = remoteHash;
+                                        updateLastSyncTime();
+                                    }
+                                }
+                            })
+                            .catch(() => {
+                                // Se falhar, continuar com localStorage
+                            });
+                    }
+                } catch (e) {
+                    console.error('Erro ao buscar sincronização:', e);
+                }
+            }
+        }
+
+        function checkUrlSync() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const syncParam = urlParams.get('sync');
+            const dataParam = urlParams.get('data');
+            
+            if (syncParam && dataParam) {
+                try {
+                    const decodedData = decodeBase64(decodeURIComponent(dataParam));
+                    const data = JSON.parse(decodedData);
+                    const sessionIdFromUrl = decodeURIComponent(syncParam);
+                    if (data.squads) {
+                        if (confirm('Dados de sincronização encontrados na URL. Deseja importar e configurar sincronização automática?')) {
+                            syncSessionId = sessionIdFromUrl;
+                            squads = data.squads;
+                            saveSquads();
+                            renderSquads();
+                            renderStatusSummary();
+                            localStorage.setItem('sync_session_id', syncSessionId);
+                            
+                            // Armazenar dados compartilhados
+                            const storageKey = `battle_aliados_${syncSessionId}`;
+                            localStorage.setItem(storageKey, encodeBase64(JSON.stringify(data)));
+                            localStorage.setItem(`${storageKey}_timestamp`, Date.now().toString());
+                            
+                            // Limpar URL
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                            
+                            // Perguntar se quer ativar sincronização automática
+                            if (confirm('Deseja ativar a sincronização automática agora?')) {
+                                syncEnabled = true;
+                                toggleAutoSync();
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Erro ao processar sincronização da URL:', e);
+                }
+            }
+        }
+
+        function updateLastSyncTime() {
+            const lastSave = localStorage.getItem('aliados_last_save');
+            if (lastSave) {
+                const date = new Date(lastSave);
+                const timeStr = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('last-sync-time').textContent = `Última atualização: ${timeStr}`;
+            }
+        }
+
+        function exportData() {
+            const data = {
+                squads: squads,
+                timestamp: new Date().toISOString(),
+                version: '1.0'
+            };
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `aliados_batalha_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // Também copiar para clipboard
+            navigator.clipboard.writeText(json).then(() => {
+                alert('Dados exportados e copiados para a área de transferência!\n\nCompartilhe o arquivo JSON ou cole o texto para sincronizar com outros jogadores.');
+            }).catch(() => {
+                alert('Dados exportados com sucesso!');
+            });
+        }
+
+        function importData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        if (data.squads && Array.isArray(data.squads)) {
+                            if (confirm(`Importar dados de ${data.timestamp ? new Date(data.timestamp).toLocaleString('pt-BR') : 'data desconhecida'}?\n\nIsso substituirá os dados atuais.`)) {
+                                squads = data.squads;
+                                saveSquads();
+                                renderSquads();
+                                renderStatusSummary();
+                                alert('Dados importados com sucesso!');
+                            }
+                        } else {
+                            alert('Formato de arquivo inválido. Certifique-se de que é um arquivo JSON exportado desta aplicação.');
+                        }
+                    } catch (error) {
+                        alert('Erro ao importar dados: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        function toggleAutoSync() {
+            syncSessionId = localStorage.getItem('sync_session_id');
+            syncEndpoint = localStorage.getItem('sync_endpoint') || null;
+
+            if (!syncSessionId) {
+                showSyncModal();
+                return;
+            }
+
+            syncEnabled = !syncEnabled;
+            const btn = document.getElementById('btn-sync');
+            const indicator = document.getElementById('sync-indicator');
+            const status = document.getElementById('sync-status');
+
+            if (syncEnabled) {
+                btn.classList.remove('bg-blue-600');
+                btn.classList.add('bg-green-600');
+                status.textContent = 'Sincronizando...';
+                indicator.classList.remove('hidden');
+                
+                // Sincronizar imediatamente
+                syncToCloud();
+                syncFromCloud();
+                
+                // Configurar sincronização automática a cada 2 segundos
+                syncInterval = setInterval(() => {
+                    syncFromCloud();
+                    syncToCloud();
+                }, 2000);
+                
+                localStorage.setItem('sync_enabled', 'true');
+            } else {
+                btn.classList.remove('bg-green-600');
+                btn.classList.add('bg-blue-600');
+                status.textContent = 'Auto Sync';
+                indicator.classList.add('hidden');
+                
+                if (syncInterval) {
+                    clearInterval(syncInterval);
+                    syncInterval = null;
+                }
+                
+                localStorage.setItem('sync_enabled', 'false');
+            }
+        }
+
+        function showSyncModal() {
+            document.getElementById('sync-modal').classList.remove('hidden');
+            document.getElementById('sync-modal').classList.add('flex');
+            document.getElementById('sync-session-id').value = localStorage.getItem('sync_session_id') || '';
+            document.getElementById('sync-endpoint').value = localStorage.getItem('sync_endpoint') || '';
+        }
+
+        function closeSyncModal() {
+            document.getElementById('sync-modal').classList.add('hidden');
+            document.getElementById('sync-modal').classList.remove('flex');
+        }
+
+        function saveSyncConfig() {
+            const sessionId = document.getElementById('sync-session-id').value.trim();
+            const endpoint = document.getElementById('sync-endpoint').value.trim();
+            
+            if (!sessionId) {
+                alert('Por favor, informe um ID de sessão.');
+                return;
+            }
+
+            syncSessionId = sessionId;
+            syncEndpoint = endpoint || null;
+            
+            localStorage.setItem('sync_session_id', sessionId);
+            if (endpoint) {
+                localStorage.setItem('sync_endpoint', endpoint);
+            } else {
+                localStorage.removeItem('sync_endpoint');
+            }
+
+            closeSyncModal();
+            
+            if (syncEnabled) {
+                syncToCloud();
+            }
+        }
+
+        async function generateShareLink() {
+            const sessionId = document.getElementById('sync-session-id').value.trim() || 'batalha-' + Date.now();
+            
+            const data = {
+                squads: squads,
+                timestamp: new Date().toISOString(),
+                sessionId: sessionId,
+                version: '1.0'
+            };
+            
+            // Criar link com dados codificados na URL
+            const jsonStr = JSON.stringify(data);
+            const shareData = encodeBase64(jsonStr);
+            const shareUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(sessionId)}&data=${encodeURIComponent(shareData)}`;
+            
+            // Tentar criar um bin público no JSONBin.io para sincronização automática
+            try {
+                const binResponse = await fetch('https://api.jsonbin.io/v3/b', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Bin-Name': `battle-aliados-${sessionId}`,
+                        'X-Bin-Private': 'false'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                if (binResponse.ok) {
+                    const binResult = await binResponse.json();
+                    const binId = binResult.metadata.id;
+                    localStorage.setItem(`bin_id_${sessionId}`, binId);
+                    
+                    const binUrl = `https://api.jsonbin.io/v3/b/${binId}/latest`;
+                    navigator.clipboard.writeText(shareUrl).then(() => {
+                        alert(`Link de compartilhamento copiado!\n\nCompartilhe este link com outros jogadores:\n${shareUrl}\n\nBin público criado para sincronização automática.`);
+                    });
+                } else {
+                    throw new Error('Falha ao criar bin');
+                }
+            } catch (e) {
+                // Se falhar, usar apenas o link com dados na URL
+                navigator.clipboard.writeText(shareUrl).then(() => {
+                    alert(`Link de compartilhamento copiado!\n\nCompartilhe este link com outros jogadores:\n${shareUrl}\n\nNota: Para sincronização automática, configure um endpoint público ou use o link compartilhado.`);
+                }).catch(() => {
+                    prompt('Copie este link para compartilhar:', shareUrl);
+                });
+            }
+        }
+
+        // --- CALCULATION LOGIC ---
+        function calculateStats(squad) {
+            let stats = { 
+                atk: squad.baseStats.atk, 
+                def: squad.baseStats.def, 
+                dmgFlat: squad.baseStats.dmgFlat,
+                dmgDice: squad.baseStats.dmgDice,
+                init: squad.baseStats.init
+            };
+
+            squad.npcs.forEach(npc => {
+                if (!npc.dead) {
+                    if (npc.buffs.atk) stats.atk += npc.buffs.atk;
+                    if (npc.buffs.def) stats.def += npc.buffs.def;
+                    if (npc.buffs.dmg) stats.dmgFlat += npc.buffs.dmg;
+                }
+            });
+
+            return stats;
+        }
+
+        // --- RENDER LOGIC ---
+        function renderSquads() {
+            const alliesContainer = document.getElementById('squad-list-allies');
+            alliesContainer.innerHTML = '';
+
+            squads.forEach((squad, index) => {
+                const livingNPCs = squad.npcs.filter(n => !n.dead).length;
+                const stats = calculateStats(squad);
+                
+                let statusColor = livingNPCs > 3 ? 'bg-green-500' 
+                                : livingNPCs > 1 ? 'bg-yellow-500' : 'bg-red-800';
+
+                const html = `
+                    <div class="squad-card rounded-lg p-4 border border-slate-700 card-glass relative overflow-hidden group" onclick="showSquadDetail(${index})">
+                        <div class="absolute top-0 left-0 w-1 h-full ${squad.color.replace('text', 'bg')}"></div>
+                        <div class="flex justify-between items-start pl-4 mb-2">
+                            <div class="flex-1">
+                                <h3 class="font-bold ${squad.color} text-base font-cinzel flex items-center gap-2 mb-1">
+                                    ${squad.name}
+                                </h3>
+                                <p class="text-xs text-slate-400 mb-2">${squad.role}</p>
+                                <div class="flex gap-1.5 text-[10px] text-slate-400 font-mono uppercase flex-wrap">
+                                    <span class="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">INIT +${stats.init}</span>
+                                    <span class="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 ${livingNPCs < 5 ? 'text-yellow-400' : ''}">ATK +${stats.atk}</span>
+                                    <span class="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700 ${livingNPCs < 5 ? 'text-yellow-400' : ''}">DEF ${stats.def}</span>
+                                    <span class="bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">${stats.dmgDice}+${stats.dmgFlat}</span>
+                                </div>
+                            </div>
+                            <div class="text-right ml-4">
+                                <span class="text-2xl font-mono font-bold ${livingNPCs < 2 ? 'text-red-500 animate-pulse' : 'text-slate-200'}">${livingNPCs}<span class="text-xs text-slate-600">/5</span></span>
+                                <div class="text-[10px] text-slate-500 mt-1">${livingNPCs === 5 ? 'Completo' : livingNPCs < 2 ? 'Crítico' : 'Ferido'}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-0.5 mt-2 pl-4 opacity-80">
+                            ${Array(5).fill(0).map((_, i) => `
+                                <div class="h-2 flex-1 rounded-sm ${i < livingNPCs ? statusColor : 'bg-slate-800'} transition-all duration-300"></div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+
+                alliesContainer.innerHTML += html;
+            });
+        }
+
+        function renderStatusSummary() {
+            const container = document.getElementById('status-summary');
+            let totalLiving = 0;
+            let totalDead = 0;
+            let totalSquads = squads.length;
+            let activeSquads = 0;
+
+            squads.forEach(squad => {
+                const living = squad.npcs.filter(n => !n.dead).length;
+                totalLiving += living;
+                totalDead += (5 - living);
+                if (living > 0) activeSquads++;
+            });
+
+            container.innerHTML = `
+                <div class="flex justify-between items-center py-2 border-b border-slate-700">
+                    <span class="text-slate-400">Esquadrões Ativos</span>
+                    <span class="font-bold text-green-400">${activeSquads}/${totalSquads}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-700">
+                    <span class="text-slate-400">Combatentes Vivos</span>
+                    <span class="font-bold text-white">${totalLiving}</span>
+                </div>
+                <div class="flex justify-between items-center py-2 border-b border-slate-700">
+                    <span class="text-slate-400">Baixas</span>
+                    <span class="font-bold text-red-400">${totalDead}</span>
+                </div>
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-slate-400">Taxa de Sobrevivência</span>
+                    <span class="font-bold ${(totalLiving / (totalSquads * 5) * 100) > 70 ? 'text-green-400' : (totalLiving / (totalSquads * 5) * 100) > 40 ? 'text-yellow-400' : 'text-red-400'}">
+                        ${Math.round(totalLiving / (totalSquads * 5) * 100)}%
+                    </span>
+                </div>
+            `;
+        }
+
+        function renderSquadDetailView(index) {
+            const squad = squads[index];
+            const livingNPCs = squad.npcs.filter(n => !n.dead).length;
+            const stats = calculateStats(squad);
+
+            const headerHtml = `
+                <div class="flex flex-col md:flex-row justify-between items-start gap-4 border-b border-slate-700 pb-4">
+                    <div class="w-full">
+                        <div class="flex justify-between items-center mb-2">
+                            <button onclick="showDashboard()" class="text-sm text-slate-400 hover:text-white flex items-center gap-2">
+                                <i class="fa-solid fa-arrow-left"></i> Voltar
+                            </button>
+                        </div>
+                        <h2 class="font-cinzel text-3xl ${squad.color} font-bold mb-2">${squad.name}</h2>
+                        <p class="text-slate-400 text-sm italic mb-1">"${squad.desc}"</p>
+                        <p class="text-xs text-slate-500 uppercase font-mono">${squad.role} | ${squad.damageType}</p>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4 text-center font-mono text-sm">
+                            <div class="bg-slate-800 p-3 rounded border border-slate-600">
+                                <span class="text-slate-500 text-[10px] block mb-1">INICIATIVA</span> 
+                                <span class="font-bold text-white text-lg">+${stats.init}</span>
+                            </div>
+                            <div class="bg-slate-800 p-3 rounded border border-slate-600">
+                                <span class="text-slate-500 text-[10px] block mb-1">ATAQUE</span> 
+                                <span class="font-bold ${livingNPCs < 5 ? 'text-yellow-500' : 'text-white'} text-lg">+${stats.atk}</span>
+                            </div>
+                            <div class="bg-slate-800 p-3 rounded border border-slate-600">
+                                <span class="text-slate-500 text-[10px] block mb-1">DEFESA</span> 
+                                <span class="font-bold ${livingNPCs < 5 ? 'text-yellow-500' : 'text-white'} text-lg">${stats.def}</span>
+                            </div>
+                            <div class="bg-slate-800 p-3 rounded border border-slate-600">
+                                <span class="text-slate-500 text-[10px] block mb-1">DANO</span> 
+                                <span class="font-bold ${livingNPCs < 5 ? 'text-yellow-500' : 'text-white'} text-sm">${stats.dmgDice}+${stats.dmgFlat}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('squad-detail-header').innerHTML = headerHtml;
+
+            const npcsContainer = document.getElementById('squad-detail-npcs');
+            npcsContainer.innerHTML = '';
+            
+            squad.npcs.forEach((npc, i) => {
+                const cardHtml = `
+                    <div class="relative bg-slate-800 rounded-lg p-5 border ${npc.dead ? 'border-slate-800 bg-slate-900 npc-dead' : 'border-slate-600 hover:border-ivory-accent bg-slate-800'} transition-all group overflow-hidden">
+                        
+                        <button onclick="toggleLife(${index}, ${i})" class="absolute top-2 right-2 z-20 w-8 h-8 flex items-center justify-center rounded-full transition-colors ${npc.dead ? 'bg-slate-700 text-slate-500 hover:bg-green-900 hover:text-green-400' : 'bg-slate-900 text-slate-600 hover:bg-red-900 hover:text-red-500'}" title="${npc.dead ? 'Reviver' : 'Abater'}">
+                            <i class="fa-solid ${npc.dead ? 'fa-heart-pulse' : 'fa-skull'}"></i>
+                        </button>
+
+                        <div class="mb-3 pr-8 relative z-10">
+                            <h4 onclick="openLoreModal(${index}, ${i})" class="font-cinzel font-bold text-lg cursor-pointer hover:underline decoration-ivory-accent underline-offset-4 decoration-2 ${npc.dead ? 'text-slate-600' : 'text-slate-100'} flex items-center gap-2">
+                                ${npc.name}
+                                <i class="fa-solid fa-circle-info text-xs opacity-50"></i>
+                            </h4>
+                            <span class="text-[10px] uppercase tracking-wider font-bold ${squad.color} opacity-80">${npc.role}</span>
+                        </div>
+
+                        <div class="mb-2 relative z-10">
+                             <span class="buff-tag inline-block px-2 py-0.5 rounded text-[10px] font-bold border bg-blue-900/30 border-blue-500/30 text-blue-300 transition-colors">
+                                <i class="fa-solid fa-arrow-up mr-1"></i>${npc.buffs.desc}
+                             </span>
+                        </div>
+
+                        <div class="bg-black/30 p-3 rounded border border-white/5 relative z-10 min-h-[80px] flex items-center">
+                            <p class="text-xs font-semibold passive-text leading-relaxed ${npc.dead ? 'text-slate-600' : 'text-ivory-accent'}">
+                                ${npc.passive}
+                            </p>
+                        </div>
+                        
+                        ${npc.dead ? '<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10"><i class="fa-solid fa-skull text-9xl"></i></div>' : ''}
+                    </div>
+                `;
+                npcsContainer.innerHTML += cardHtml;
+            });
+        }
+
+        // --- LORE MODAL ---
+        function openLoreModal(squadIndex, npcIndex) {
+            const npc = squads[squadIndex].npcs[npcIndex];
+            const modal = document.getElementById('lore-modal');
+            const content = document.getElementById('lore-content');
+
+            content.innerHTML = `
+                <div class="text-center mb-4">
+                    <h3 class="font-cinzel text-2xl text-ivory-accent font-bold">${npc.name}</h3>
+                    <p class="text-xs uppercase tracking-widest text-slate-400">${npc.role}</p>
+                </div>
+                <div class="prose prose-invert prose-sm max-w-none mb-4">
+                    <p class="text-slate-300 leading-relaxed italic text-center">"${npc.lore}"</p>
+                </div>
+                <div class="pt-4 border-t border-slate-700">
+                    <p class="text-[10px] text-slate-500 uppercase mb-2 text-center">Habilidade Passiva</p>
+                    <p class="text-sm font-bold text-ivory-tech text-center">${npc.passive}</p>
+                </div>
+            `;
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeLoreModal() {
+            const modal = document.getElementById('lore-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // --- ACTIONS ---
+        function showDashboard() {
+            document.getElementById('view-dashboard').classList.remove('hidden');
+            document.getElementById('view-squad-detail').classList.add('hidden');
+            document.getElementById('btn-back').classList.add('hidden');
+            renderSquads();
+            renderStatusSummary();
+        }
+
+        function showSquadDetail(index) {
+            document.getElementById('view-dashboard').classList.add('hidden');
+            document.getElementById('view-squad-detail').classList.remove('hidden');
+            document.getElementById('btn-back').classList.remove('hidden');
+            renderSquadDetailView(index);
+        }
+
+        function toggleLife(squadIndex, npcIndex) {
+            const squad = squads[squadIndex];
+            squad.npcs[npcIndex].dead = !squad.npcs[npcIndex].dead;
+            saveSquads();
+            renderSquadDetailView(squadIndex);
+            renderStatusSummary();
+        }
+
+        function setTension(val) {
+            const btn1 = document.getElementById('btn-nt-1');
+            const btn2 = document.getElementById('btn-nt-2');
+            const btn3 = document.getElementById('btn-nt-3');
+            const desc = document.getElementById('tension-desc');
+            
+            [btn1, btn2, btn3].forEach(b => b.classList.remove('bg-ivory-accent', 'text-slate-900'));
+            
+            let text = "";
+            if(val === 1) {
+                btn1.classList.add('bg-ivory-accent', 'text-slate-900');
+                text = "NT1: Combate Tático. Inimigos usam cobertura e focam em alvos isolados.";
+            } else if (val === 2) {
+                btn2.classList.add('bg-ivory-accent', 'text-slate-900');
+                text = "NT2: Escalação. O Boss ativa o 'Protocolo Extermínio' e ganha +2 de Ataque.";
+            } else {
+                btn3.classList.add('bg-ivory-accent', 'text-slate-900');
+                text = "NT3: Zona de Guerra Total. Terreno difícil, explosões aleatórias (4d6 fogo/rodada).";
+            }
+            desc.innerText = text;
+            localStorage.setItem('aliados_tension', val);
+        }
+
+        function selectAction(type) {
+            const actions = {
+                'ATQ': 'COORDENAR FOGO: +2 Ataque. +4d6 Dano (Flanqueio).',
+                'DEF': 'LINHA DE DEFESA: +5 Defesa. Cobertura Total.',
+                'MOV': 'REPOSICIONAR: Deslocamento Dobrado. Foge de Combate.',
+                'ESP': 'RITUAL DE GUERRA: Recupera 1 Baixa ou Buff em Área.'
+            };
+            alert(`Ordem Tática Selecionada!\n\n${actions[type]}\n\nAplique os bônus descritos no turno do esquadrão.`);
+        }
+
+        // --- INIT ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSquads();
+            checkUrlSync();
+            
+            // Carregar configuração de sincronização
+            syncSessionId = localStorage.getItem('sync_session_id');
+            syncEndpoint = localStorage.getItem('sync_endpoint') || null;
+            
+            // Se já estava sincronizando, reativar
+            if (syncSessionId && localStorage.getItem('sync_enabled') === 'true') {
+                syncEnabled = true;
+                toggleAutoSync();
+            }
+            
+            const savedTension = localStorage.getItem('aliados_tension') || '1';
+            setTension(parseInt(savedTension));
+            renderSquads();
+            renderStatusSummary();
+            updateLastSyncTime();
+        });
+
+        // Salvar estado de sincronização
+        window.addEventListener('beforeunload', () => {
+            localStorage.setItem('sync_enabled', syncEnabled ? 'true' : 'false');
+        });
+
+    </script>
 </body>
 </html>
 
