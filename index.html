@@ -503,8 +503,8 @@
                     localStorage.setItem(storageKey, shareData);
                     localStorage.setItem(`${storageKey}_timestamp`, Date.now().toString());
                     
-                    // Criar link compartilhável com dados codificados
-                    const shareUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(syncSessionId)}&data=${encodeURIComponent(shareData)}`;
+                    // Criar link compartilhável apenas com ID de sessão
+                    const shareUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(syncSessionId)}`;
                     sessionStorage.setItem('share_url', shareUrl);
                     
                     // Tentar usar um serviço público de armazenamento (JSONBin.io)
@@ -613,37 +613,80 @@
             const syncParam = urlParams.get('sync');
             const dataParam = urlParams.get('data');
             
-            if (syncParam && dataParam) {
-                try {
-                    const decodedData = decodeBase64(decodeURIComponent(dataParam));
-                    const data = JSON.parse(decodedData);
-                    const sessionIdFromUrl = decodeURIComponent(syncParam);
-                    if (data.squads) {
-                        if (confirm('Dados de sincronização encontrados na URL. Deseja importar e configurar sincronização automática?')) {
-                            syncSessionId = sessionIdFromUrl;
-                            squads = data.squads;
-                            saveSquads();
-                            renderSquads();
-                            renderStatusSummary();
-                            localStorage.setItem('sync_session_id', syncSessionId);
-                            
-                            // Armazenar dados compartilhados
-                            const storageKey = `battle_aliados_${syncSessionId}`;
-                            localStorage.setItem(storageKey, encodeBase64(JSON.stringify(data)));
-                            localStorage.setItem(`${storageKey}_timestamp`, Date.now().toString());
-                            
-                            // Limpar URL
-                            window.history.replaceState({}, document.title, window.location.pathname);
-                            
-                            // Perguntar se quer ativar sincronização automática
-                            if (confirm('Deseja ativar a sincronização automática agora?')) {
-                                syncEnabled = true;
-                                toggleAutoSync();
+            if (syncParam) {
+                const sessionIdFromUrl = decodeURIComponent(syncParam);
+                
+                // Se houver dados na URL (compatibilidade com links antigos)
+                if (dataParam) {
+                    try {
+                        const decodedData = decodeBase64(decodeURIComponent(dataParam));
+                        const data = JSON.parse(decodedData);
+                        if (data.squads) {
+                            if (confirm('Dados de sincronização encontrados na URL. Deseja importar e configurar sincronização automática?')) {
+                                syncSessionId = sessionIdFromUrl;
+                                squads = data.squads;
+                                saveSquads();
+                                renderSquads();
+                                renderStatusSummary();
+                                localStorage.setItem('sync_session_id', syncSessionId);
+                                
+                                // Armazenar dados compartilhados
+                                const storageKey = `battle_aliados_${syncSessionId}`;
+                                localStorage.setItem(storageKey, encodeBase64(JSON.stringify(data)));
+                                localStorage.setItem(`${storageKey}_timestamp`, Date.now().toString());
+                                
+                                // Limpar URL
+                                window.history.replaceState({}, document.title, window.location.pathname);
+                                
+                                // Perguntar se quer ativar sincronização automática
+                                if (confirm('Deseja ativar a sincronização automática agora?')) {
+                                    syncEnabled = true;
+                                    toggleAutoSync();
+                                }
                             }
                         }
+                    } catch (e) {
+                        console.error('Erro ao processar sincronização da URL:', e);
                     }
-                } catch (e) {
-                    console.error('Erro ao processar sincronização da URL:', e);
+                } else {
+                    // Apenas ID de sessão na URL - configurar sincronização
+                    syncSessionId = sessionIdFromUrl;
+                    localStorage.setItem('sync_session_id', syncSessionId);
+                    
+                    // Limpar URL
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                    
+                    // Tentar buscar dados do localStorage ou sincronizar
+                    const storageKey = `battle_aliados_${syncSessionId}`;
+                    const shareData = localStorage.getItem(storageKey);
+                    
+                    if (shareData) {
+                        try {
+                            const decodedData = decodeBase64(shareData);
+                            const data = JSON.parse(decodedData);
+                            if (data.squads && data.sessionId === syncSessionId) {
+                                if (confirm('Sessão de sincronização encontrada. Deseja carregar os dados e ativar sincronização automática?')) {
+                                    squads = data.squads;
+                                    saveSquads();
+                                    renderSquads();
+                                    renderStatusSummary();
+                                    
+                                    if (confirm('Deseja ativar a sincronização automática agora?')) {
+                                        syncEnabled = true;
+                                        toggleAutoSync();
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Erro ao carregar dados:', e);
+                        }
+                    } else {
+                        // Não há dados locais, apenas configurar sessão
+                        if (confirm('Sessão de sincronização configurada. Deseja ativar a sincronização automática para receber atualizações?')) {
+                            syncEnabled = true;
+                            toggleAutoSync();
+                        }
+                    }
                 }
             }
         }
@@ -801,9 +844,17 @@
         function copyCurrentUrl() {
             const btn = document.getElementById('btn-copy-url');
             
-            // Gerar link compartilhável com dados atuais
-            const sessionId = syncSessionId || localStorage.getItem('sync_session_id') || 'batalha-' + Date.now();
+            // Obter ou criar ID de sessão
+            let sessionId = syncSessionId || localStorage.getItem('sync_session_id');
             
+            if (!sessionId) {
+                // Criar novo ID de sessão
+                sessionId = 'batalha-' + Date.now();
+                localStorage.setItem('sync_session_id', sessionId);
+                syncSessionId = sessionId;
+            }
+            
+            // Salvar dados atuais no localStorage para sincronização
             const data = {
                 squads: squads,
                 timestamp: new Date().toISOString(),
@@ -811,10 +862,14 @@
                 version: '1.0'
             };
             
-            // Criar link com dados codificados na URL
+            const storageKey = `battle_aliados_${sessionId}`;
             const jsonStr = JSON.stringify(data);
             const shareData = encodeBase64(jsonStr);
-            const shareUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(sessionId)}&data=${encodeURIComponent(shareData)}`;
+            localStorage.setItem(storageKey, shareData);
+            localStorage.setItem(`${storageKey}_timestamp`, Date.now().toString());
+            
+            // Criar link apenas com ID de sessão (sem dados na URL)
+            const shareUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(sessionId)}`;
             
             navigator.clipboard.writeText(shareUrl).then(() => {
                 // Feedback visual
@@ -830,7 +885,7 @@
                         btn.classList.add('bg-amber-600', 'hover:bg-amber-700');
                     }, 2000);
                 } else {
-                    alert('URL compartilhável copiada para a área de transferência!');
+                    alert('URL compartilhável copiada! Compartilhe este link e ative a sincronização automática.');
                 }
             }).catch(() => {
                 // Fallback para navegadores mais antigos
@@ -842,7 +897,7 @@
                 textArea.select();
                 try {
                     document.execCommand('copy');
-                    alert('URL compartilhável copiada para a área de transferência!');
+                    alert('URL compartilhável copiada! Compartilhe este link e ative a sincronização automática.');
                 } catch (err) {
                     prompt('Copie a URL manualmente:', shareUrl);
                 }
@@ -860,10 +915,17 @@
                 version: '1.0'
             };
             
-            // Criar link com dados codificados na URL
+            // Salvar dados no localStorage
+            const storageKey = `battle_aliados_${sessionId}`;
             const jsonStr = JSON.stringify(data);
             const shareData = encodeBase64(jsonStr);
-            const shareUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(sessionId)}&data=${encodeURIComponent(shareData)}`;
+            localStorage.setItem(storageKey, shareData);
+            localStorage.setItem(`${storageKey}_timestamp`, Date.now().toString());
+            localStorage.setItem('sync_session_id', sessionId);
+            syncSessionId = sessionId;
+            
+            // Criar link apenas com ID de sessão (sem dados na URL)
+            const shareUrl = `${window.location.origin}${window.location.pathname}?sync=${encodeURIComponent(sessionId)}`;
             
             // Tentar criar um bin público no JSONBin.io para sincronização automática
             try {
@@ -882,7 +944,6 @@
                     const binId = binResult.metadata.id;
                     localStorage.setItem(`bin_id_${sessionId}`, binId);
                     
-                    const binUrl = `https://api.jsonbin.io/v3/b/${binId}/latest`;
                     navigator.clipboard.writeText(shareUrl).then(() => {
                         alert(`Link de compartilhamento copiado!\n\nCompartilhe este link com outros jogadores:\n${shareUrl}\n\nBin público criado para sincronização automática.`);
                     });
@@ -890,9 +951,9 @@
                     throw new Error('Falha ao criar bin');
                 }
             } catch (e) {
-                // Se falhar, usar apenas o link com dados na URL
+                // Se falhar, usar apenas localStorage compartilhado
                 navigator.clipboard.writeText(shareUrl).then(() => {
-                    alert(`Link de compartilhamento copiado!\n\nCompartilhe este link com outros jogadores:\n${shareUrl}\n\nNota: Para sincronização automática, configure um endpoint público ou use o link compartilhado.`);
+                    alert(`Link de compartilhamento copiado!\n\nCompartilhe este link com outros jogadores:\n${shareUrl}\n\nNota: Ative a sincronização automática para receber atualizações em tempo real.`);
                 }).catch(() => {
                     prompt('Copie este link para compartilhar:', shareUrl);
                 });
